@@ -6,6 +6,7 @@ from typing import Optional
 from stock_service import get_stock_k_data, query_all_stock
 from data.tradingview_source import TradingViewSource
 from data.datetime_ts import ts_open_to_ms, epoch_to_date_str
+from api.market_data_v1 import router as market_data_v1_router
 
 app = FastAPI(title="股票数据API服务", version="1.0.0")
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(market_data_v1_router)
 
 
 class StockDataResponse(BaseModel):
