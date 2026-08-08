@@ -221,7 +221,7 @@ def fetch_bars(request: BarRequest) -> dict | JSONResponse:
         "period": request.period,
         "adjustment": request.adjustment,
         "timezone": "Asia/Shanghai",
-        "volumeUnit": "lot",
+        "volumeUnit": "share",
         "items": items,
     })
 
