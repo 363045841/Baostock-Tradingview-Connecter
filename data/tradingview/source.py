@@ -5,6 +5,7 @@ import os
 import platform
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime, timedelta
 
 from data.base import (
@@ -32,6 +33,8 @@ _TV_FETCH_RETRIES = 1
 _TV_FETCH_RETRY_SLEEP_S = 0.5
 _TV_WS_TIMEOUT_S = 10.0
 _TV_WS_TIMEOUT_ATTR = "_TvDatafeed__ws_timeout"
+# 单次 get_hist 总超时：需早于前端 15s 的 Effect.timeout，让业务错误先返回
+_TV_FETCH_TIMEOUT_S = 12.0
 
 def _ensure_proxy() -> None:
     """Set HTTP_PROXY / HTTPS_PROXY env vars for tvDatafeed WebSocket connections.
@@ -222,7 +225,7 @@ class TradingViewSource(DataSource):
         last_exc: BaseException | None = None
         for attempt in range(1, _TV_FETCH_RETRIES + 1):
             try:
-                df = self._tv.get_hist(
+                df = self._get_hist_with_timeout(
                     symbol=symbol,
                     exchange=exchange,
                     interval=interval,
@@ -249,6 +252,41 @@ class TradingViewSource(DataSource):
         if last_exc is not None:
             raise last_exc
         return None
+
+    def _get_hist_with_timeout(
+        self,
+        *,
+        symbol: str,
+        exchange: str,
+        interval: object,
+        n_bars: int,
+        adjustment: str,
+    ):
+        """带总超时地调用 tvDatafeed.get_hist，避免 recv 无限阻塞。
+
+        get_hist 的 recv 循环对无效品种不设硬超时，可能远超前端 15s 等待，
+        这里用独立线程 + future.result(timeout) 兜底，超时即抛可识别错误。
+        """
+        pool = ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(
+            self._tv.get_hist,
+            symbol=symbol,
+            exchange=exchange,
+            interval=interval,
+            n_bars=n_bars,
+            adjustment=adjustment,
+        )
+        try:
+            return future.result(timeout=_TV_FETCH_TIMEOUT_S)
+        except FutureTimeout:
+            self._close_tv_socket()
+            raise DataSourceTransientError(
+                f"TradingView 拉取超时（{exchange or ''} / {symbol}）："
+                f"超过 {int(_TV_FETCH_TIMEOUT_S)}s 未返回，请检查交易所与品种是否有效"
+            )
+        finally:
+            # 不等待后台 recv 线程结束，避免再次阻塞；socket 已由超时路径或调用方关闭
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _fetch_tv_auto_probe(
         self,
