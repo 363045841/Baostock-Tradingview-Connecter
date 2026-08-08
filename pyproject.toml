@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "baostock==0.9.1",
+    "baostock>=0.9.1",
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
     "pandas>=2.0.0",
