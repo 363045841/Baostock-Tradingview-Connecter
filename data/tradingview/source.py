@@ -14,13 +14,17 @@ from data.base import (
     normalize_kline_bar,
 )
 from data.datetime_ts import datetime_to_ts_ms
-from data.market_defaults import (
+from data.tradingview.bar_close_wait import (
+    seconds_until_bar_closes,
+)
+from data.tradingview.config import load_proxy_config
+from data.tradingview.market_defaults import (
     is_tv_exchange_auto,
     resolve_tv_fetch_pair,
     tv_auto_probe_plan,
 )
-from data.tv_symbol_lookup import TvSymbolNotFoundError, is_tv_name_input
-from data.tradingview_errors import format_tradingview_fetch_error
+from data.tradingview.symbol_lookup import TvSymbolNotFoundError, is_tv_name_input
+from data.tradingview.errors import format_tradingview_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +44,7 @@ def _ensure_proxy() -> None:
     if os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY"):
         return
 
-    from data.config import load_proxy_config
+    from data.tradingview.config import load_proxy_config
 
     cfg = load_proxy_config()
     if cfg.get("http"):
@@ -465,7 +469,7 @@ class TradingViewSource(DataSource):
             bars.append(normalize_kline_bar(bar))
 
         if bars:
-            from data.bar_close_wait import seconds_until_bar_closes
+            from data.tradingview.bar_close_wait import seconds_until_bar_closes
             last = bars[-1]
             secs_left = seconds_until_bar_closes(last.ts_open, self._timeframe, now_ms=None)
             still_forming = secs_left is not None and secs_left > 0
@@ -510,7 +514,7 @@ class TradingViewSource(DataSource):
                 closed=True,
             )
             if i == len(rows) - 1:
-                from data.bar_close_wait import seconds_until_bar_closes
+                from data.tradingview.bar_close_wait import seconds_until_bar_closes
                 secs_left = seconds_until_bar_closes(ts_ms, self._timeframe, now_ms=None)
                 still_forming = secs_left is not None and secs_left > 0
                 bar = KlineBar(

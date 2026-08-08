@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from data.market_defaults import (
+from data.tradingview.market_defaults import (
     TV_HK_EXCHANGE,
     infer_ashare_tv_exchange,
     is_ashare_tv_request,
@@ -8,7 +8,7 @@ from data.market_defaults import (
     normalize_ashare_tv_code,
     normalize_hk_tv_code,
 )
-from data.tv_symbol_lookup import is_tv_name_input
+from data.tradingview.symbol_lookup import is_tv_name_input
 
 
 def format_tradingview_fetch_error(

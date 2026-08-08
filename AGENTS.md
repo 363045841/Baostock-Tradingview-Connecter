@@ -25,15 +25,18 @@ tvDatafeed 底层走 WebSocket，部分环境需要代理才能连 TradingView�
 
 ```
 data/
-├── base.py               KlineBar 数据类、DataSource 抽象、错误类型
-├── tradingview_source.py  TvDatafeed 封装，含连接/订阅/快照/交易所自动探测
-├── market_defaults.py     交易所解析、品种自动探测（A 股/港股/黄金/加密/指数）
-├── tv_symbol_lookup.py    中文/英文名称 → TradingView 交易所+代码映射
-├── config.py              配置加载（proxy.json）
-├── datetime_ts.py         时间戳转换
-├── bar_close_wait.py      K 线闭合状态判断
-└── tradingview_errors.py  TradingView 错误消息格式化
+├── base.py                KlineBar 数据类、DataSource 抽象、错误类型（共享）
+├── datetime_ts.py         时间戳转换（共享）
+└── tradingview/           TradingView 数据源子包
+    ├── source.py           TvDatafeed 封装，含连接/订阅/快照/交易所自动探测
+    ├── market_defaults.py   交易所解析、品种自动探测（A 股/港股/黄金/加密/指数）
+    ├── symbol_lookup.py     中文/英文名称 → TradingView 交易所+代码映射
+    ├── config.py            配置加载（proxy.json）
+    ├── bar_close_wait.py    K 线闭合状态判断
+    └── errors.py            TradingView 错误消息格式化
 ```
+
+baostock 相关代码在顶层 `stock_service.py` 与 `api/market_data_v1.py`。
 
 ## Docker
 

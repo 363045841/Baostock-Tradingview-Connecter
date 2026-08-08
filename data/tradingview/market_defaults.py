@@ -172,7 +172,7 @@ def _is_hk_tv_code(code: str) -> bool:
 
 
 def is_partial_tv_symbol_input(symbol: str) -> bool:
-    from data.tv_symbol_lookup import is_tv_name_input
+    from data.tradingview.symbol_lookup import is_tv_name_input
 
     s = (symbol or "").strip()
     if not s:
@@ -245,7 +245,7 @@ def tv_auto_probe_plan(symbol: str) -> list[tuple[str, str]]:
 
 
 def equity_tv_auto_probe_plan(symbol: str) -> list[tuple[str, str]]:
-    from data.tv_symbol_lookup import lookup_tv_symbol_by_name, is_tv_name_input
+    from data.tradingview.symbol_lookup import lookup_tv_symbol_by_name, is_tv_name_input
 
     upper = (symbol or "").strip().upper()
     if upper in _KNOWN_INDEX_TICKERS:
@@ -301,7 +301,7 @@ def is_ashare_tv_request(exchange: str, symbol: str) -> bool:
 
 
 def is_equity_tv_request(exchange: str, symbol: str) -> bool:
-    from data.tv_symbol_lookup import is_tv_name_input
+    from data.tradingview.symbol_lookup import is_tv_name_input
 
     if is_tv_name_input(symbol):
         return True
@@ -357,7 +357,7 @@ def resolve_tv_hk_pair(
 
 
 def resolve_tv_fetch_pair(exchange: str, symbol: str) -> tuple[str, str]:
-    from data.tv_symbol_lookup import (
+    from data.tradingview.symbol_lookup import (
         is_tv_name_input,
         lookup_tv_symbol_by_name,
     )
@@ -377,7 +377,7 @@ def resolve_tv_pair(
     exchange: str,
     symbol: str,
 ) -> tuple[str, str, bool]:
-    from data.tv_symbol_lookup import (
+    from data.tradingview.symbol_lookup import (
         is_tv_name_input,
         lookup_tv_symbol_by_name,
     )

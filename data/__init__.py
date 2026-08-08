@@ -1,1 +1,1 @@
-"""Stockbao data layer package — TradingView, Baostock, and common types."""
+"""Stockbao data layer package — common types and the TradingView subpackage."""
