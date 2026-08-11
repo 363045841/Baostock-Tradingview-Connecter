@@ -1,6 +1,6 @@
 # 股票数据 API 服务 (stockbao)
 
-基于 FastAPI 的股票数据接口服务，支持 **Baostock**（A 股）和 **TradingView**（全球品种）两个数据源。
+基于 FastAPI 的行情接口服务，支持 **Baostock**（A 股）、**TradingView**（全球品种）和 **finshare**（国内期货）数据源。
 
 ---
 
@@ -27,6 +27,8 @@ uv run python server.py
 | `/api/stock/query` | GET | Baostock | 最近 N 天快捷查询 |
 | `/api/stock/list` | GET | Baostock | 股票列表 |
 | `/api/tradingview/kdata` | GET | TradingView | 全球品种 K 线 |
+| `/api/v1/market-data/bars` | POST | finshare | 期货日线 K 线（`cu0`、`IF2409` 等） |
+| `/api/v1/market-data/snapshot` | POST | finshare | 期货实时快照 |
 
 ---
 
@@ -143,7 +145,49 @@ GET /api/stock/list?date=2024-12-31
 
 ---
 
-## 2. TradingView 接口（全球品种）
+## 2. finshare 期货接口（V1）
+
+V1 数据源 ID 为 `finshare`，支持国内五大期货交易所：CFFEX、SHFE、DCE、CZCE 和 INE。
+搜索期货时使用代码，例如 `cu0`（沪铜连续）或 `IF2409`（股指期货合约）。
+
+```json
+POST /api/v1/market-data/bars
+{
+  "sourceId": "finshare",
+  "instrument": {
+    "id": "finshare:future:shfe:cu0",
+    "symbol": "CU0",
+    "exchange": "SHFE",
+    "providerRef": {"futureCode": "CU0"}
+  },
+  "period": "daily",
+  "adjustment": "none",
+  "limit": 100
+}
+```
+
+`limit` 必填，范围为 1 到 5000。省略 `before` 时返回最新的 N 根 K 线；传入 `before`（UTC Unix 毫秒）时，返回严格早于该时间戳的上一页数据。每页均按时间升序返回。
+
+```json
+{
+  "sourceId": "finshare",
+  "instrument": {
+    "id": "finshare:future:shfe:cu0",
+    "symbol": "CU0",
+    "exchange": "SHFE"
+  },
+  "period": "daily",
+  "adjustment": "none",
+  "limit": 100,
+  "before": 1735603200000
+}
+```
+
+实时快照使用同样的 `instrument`，将路径改为 `/api/v1/market-data/snapshot`。
+
+---
+
+## 3. TradingView 接口（全球品种）
 
 ### GET /api/tradingview/kdata
 

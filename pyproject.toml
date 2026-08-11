@@ -10,4 +10,5 @@ dependencies = [
     "uvicorn>=0.34.0",
     "pandas>=2.0.0",
     "tvdatafeed @ git+https://github.com/363045841/tvdatafeed.git",
+    "finshare>=2.1.0",
 ]
