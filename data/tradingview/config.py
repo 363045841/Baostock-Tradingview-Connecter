@@ -7,7 +7,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 PROXY_CONFIG_FILE = CONFIG_DIR / "proxy.json"
 
 
