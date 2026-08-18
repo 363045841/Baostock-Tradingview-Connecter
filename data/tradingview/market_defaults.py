@@ -56,7 +56,11 @@ _KNOWN_INDEX_TICKERS: dict[str, list[tuple[str, str]]] = {
 TV_ASHARE_EXCHANGES: frozenset[str] = frozenset({"SSE", "SZSE"})
 TV_HK_EXCHANGE = "HKEX"
 TV_HK_EXCHANGES: frozenset[str] = frozenset({TV_HK_EXCHANGE, "HK", "HKG", "HONGKONG"})
-TV_EQUITY_EXCHANGES: frozenset[str] = TV_ASHARE_EXCHANGES | TV_HK_EXCHANGES
+TV_KR_EXCHANGE = "KRX"
+TV_KR_EXCHANGES: frozenset[str] = frozenset({TV_KR_EXCHANGE})
+TV_EQUITY_EXCHANGES: frozenset[str] = (
+    TV_ASHARE_EXCHANGES | TV_HK_EXCHANGES | TV_KR_EXCHANGES
+)
 TV_SSE_INDEX_CODES: frozenset[str] = frozenset(
     {"000016", "000300", "000905", "000852"}
 )
@@ -72,6 +76,7 @@ TV_EXCHANGE_PRESETS: tuple[str, ...] = (
     "SSE",
     "SZSE",
     "HKEX",
+    "KRX",
     "SP",
     "NYSE",
     "NASDAQ",
@@ -261,7 +266,7 @@ def equity_tv_auto_probe_plan(symbol: str) -> list[tuple[str, str]]:
     if _is_ashare_tv_code(code_a):
         first = infer_ashare_tv_exchange(code_a)
         second = "SZSE" if first == "SSE" else "SSE"
-        return [(first, code_a), (second, code_a)]
+        return [(first, code_a), (second, code_a), (TV_KR_EXCHANGE, code_a)]
 
     code_h = normalize_hk_tv_code(symbol)
     if _is_hk_tv_code(code_h):
@@ -280,6 +285,11 @@ def equity_tv_auto_probe_plan(symbol: str) -> list[tuple[str, str]]:
     return []
 
 
+def is_known_index_tv_symbol(symbol: str) -> bool:
+    """判断代码是否属于内置的 TradingView 指数映射。"""
+    return (symbol or "").strip().upper() in _KNOWN_INDEX_TICKERS
+
+
 def ashare_tv_probe_order(code: str) -> tuple[str, str]:
     first = infer_ashare_tv_exchange(code)
     second = "SZSE" if first == "SSE" else "SSE"
@@ -291,6 +301,11 @@ def is_hk_tv_request(exchange: str, symbol: str) -> bool:
     if ex in TV_HK_EXCHANGES:
         return True
     return _is_hk_tv_code(normalize_hk_tv_code(symbol))
+
+
+def is_kr_tv_request(exchange: str, _symbol: str) -> bool:
+    """仅按显式交易所识别韩股，避免六位代码与 A 股冲突。"""
+    return (exchange or "").strip().upper() in TV_KR_EXCHANGES
 
 
 def is_ashare_tv_request(exchange: str, symbol: str) -> bool:
@@ -305,7 +320,25 @@ def is_equity_tv_request(exchange: str, symbol: str) -> bool:
 
     if is_tv_name_input(symbol):
         return True
-    return is_ashare_tv_request(exchange, symbol) or is_hk_tv_request(exchange, symbol)
+    return (
+        is_kr_tv_request(exchange, symbol)
+        or is_ashare_tv_request(exchange, symbol)
+        or is_hk_tv_request(exchange, symbol)
+    )
+
+
+def resolve_tv_kr_pair(
+    exchange: str,
+    symbol: str,
+) -> tuple[str, str, bool] | None:
+    """保留显式 KRX 六位代码，不让 A 股推断覆盖用户选择。"""
+    ex_in = (exchange or "").strip().upper()
+    if ex_in not in TV_KR_EXCHANGES:
+        return None
+    code = re.sub(r"\D", "", (symbol or "").strip())
+    if len(code) != 6:
+        return None
+    return TV_KR_EXCHANGE, code, ex_in != TV_KR_EXCHANGE
 
 
 def resolve_tv_ashare_pair(
@@ -400,6 +433,10 @@ def resolve_tv_pair(
             if ex_try == ex_in:
                 return ex_try, sym_try, False
         return ex_in, sym, False
+
+    korean = resolve_tv_kr_pair(exchange, symbol)
+    if korean is not None:
+        return korean
 
     ashare = resolve_tv_ashare_pair(exchange, symbol)
     if ashare is not None:
