@@ -13,7 +13,14 @@ from pydantic import BaseModel, Field, ValidationError
 
 from stock_service import get_stock_k_data, query_all_stock
 from data.tradingview.source import TradingViewSource
-from data.tradingview.market_defaults import tv_auto_probe_plan
+from data.tradingview.market_defaults import (
+    is_ashare_tv_request,
+    is_hk_tv_request,
+    is_known_index_tv_symbol,
+    is_kr_tv_request,
+    is_likely_crypto_symbol,
+    tv_auto_probe_plan,
+)
 from data.tradingview.symbol_lookup import lookup_tv_symbol_by_name
 from data.datetime_ts import epoch_to_date_str
 from data.finshare.source import fetch_bars as fetch_finshare_bars
@@ -31,7 +38,17 @@ Adjustment = Literal["qfq", "hfq", "none", "splits"]
 _SUPPORTED_SOURCES = frozenset({"baostock", "tradingview", "finshare"})
 
 # TradingView 周期/复权到 tvDatafeed 的映射
-_TV_PERIODS = ["1min", "5min", "15min", "30min", "60min", "daily", "weekly", "monthly"]
+_TV_PERIODS = (
+    "1min",
+    "5min",
+    "15min",
+    "30min",
+    "60min",
+    "daily",
+    "weekly",
+    "monthly",
+)
+_TV_ADJUSTMENTS = ("qfq", "splits", "none")
 _TV_PERIOD_TO_TF = {
     "1min": "1m",
     "5min": "5m",
@@ -59,8 +76,26 @@ _TV_BARS_PER_DAY = {
 _TV_SESSION_TZ = {
     "CN": "Asia/Shanghai",
     "HK": "Asia/Hong_Kong",
+    "KR": "Asia/Seoul",
     "US": "America/New_York",
 }
+_TV_SESSION_CURRENCY = {"CN": "CNY", "HK": "HKD", "KR": "KRW", "US": "USD"}
+
+
+def _tradingview_bar_capabilities() -> dict[str, list[str]]:
+    """返回独立的 TradingView K 线能力快照，避免响应间共享可变容器。"""
+    return {
+        "periods": list(_TV_PERIODS),
+        "adjustments": list(_TV_ADJUSTMENTS),
+    }
+
+
+def _tradingview_capabilities() -> dict[str, object]:
+    """返回 TradingView 数据源可用于请求路由的源级能力。"""
+    return {
+        "assetClasses": ["stock", "index", "forex", "crypto", "unknown"],
+        "bars": _tradingview_bar_capabilities(),
+    }
 
 
 class InstrumentReference(BaseModel):
@@ -379,11 +414,8 @@ def _fetch_finshare_snapshot(request: SnapshotRequest) -> dict:
 
 def _tv_session(symbol: str, exchange: str) -> str:
     """按品种/交易所推断交易时段标识。"""
-    from data.tradingview.market_defaults import (
-        is_ashare_tv_request,
-        is_hk_tv_request,
-    )
-
+    if is_kr_tv_request(exchange, symbol):
+        return "KR"
     if is_ashare_tv_request(exchange, symbol):
         return "CN"
     if is_hk_tv_request(exchange, symbol):
@@ -393,21 +425,18 @@ def _tv_session(symbol: str, exchange: str) -> str:
 
 def _tv_asset_class(symbol: str, exchange: str) -> str:
     """按品种/交易所推断资产类别。"""
-    from data.tradingview.market_defaults import (
-        _KNOWN_INDEX_TICKERS,
-        is_ashare_tv_request,
-        is_hk_tv_request,
-        is_likely_crypto_symbol,
-    )
-
     upper = symbol.upper()
-    if upper in _KNOWN_INDEX_TICKERS:
+    if is_known_index_tv_symbol(upper):
         return "index"
     if upper in ("XAUUSD", "GOLD", "XAGUSD") or "/" in upper:
         return "forex"
     if is_likely_crypto_symbol(upper):
         return "crypto"
-    if is_ashare_tv_request(exchange, symbol) or is_hk_tv_request(exchange, symbol):
+    if (
+        is_kr_tv_request(exchange, symbol)
+        or is_ashare_tv_request(exchange, symbol)
+        or is_hk_tv_request(exchange, symbol)
+    ):
         return "stock"
     return "unknown"
 
@@ -417,7 +446,6 @@ def _tv_instrument(symbol: str, exchange: str = "") -> dict[str, object]:
     sym = (symbol or "").strip()
     ex = (exchange or "").strip().upper()
     session = _tv_session(sym, ex)
-    currency = {"CN": "CNY", "HK": "HKD"}.get(session, "USD")
     return {
         "id": f"tradingview:{ex or 'auto'}:{sym}",
         "sourceId": "tradingview",
@@ -426,14 +454,9 @@ def _tv_instrument(symbol: str, exchange: str = "") -> dict[str, object]:
         "assetClass": _tv_asset_class(sym, ex),
         "exchange": ex or "AUTO",
         "sessionId": session,
-        "currency": currency,
+        "currency": _TV_SESSION_CURRENCY[session],
         "providerRef": {"exchange": ex, "symbol": sym},
-        "capabilities": {
-            "bars": {
-                "periods": _TV_PERIODS,
-                "adjustments": ["qfq", "splits", "none"],
-            }
-        },
+        "capabilities": {"bars": _tradingview_bar_capabilities()},
     }
 
 
@@ -447,6 +470,7 @@ def _probe_tradingview() -> dict:
             "status": "online",
             "checkedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "latencyMs": round((time.perf_counter() - started) * 1000, 2),
+            "capabilities": _tradingview_capabilities(),
         }
     except Exception as exc:
         return {
@@ -454,6 +478,7 @@ def _probe_tradingview() -> dict:
             "checkedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "latencyMs": round((time.perf_counter() - started) * 1000, 2),
             "message": str(exc),
+            "capabilities": _tradingview_capabilities(),
         }
 
 
